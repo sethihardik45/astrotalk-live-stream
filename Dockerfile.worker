@@ -14,4 +14,6 @@ COPY worker ./worker
 COPY tsconfig.json ./
 RUN npx prisma generate
 USER node
-CMD ["npx", "tsx", "worker/index.ts"]
+# Create / upgrade the database tables first (safe to repeat: it only applies what is missing), then run the worker.
+# Doing it here, rather than relying on a platform setting, means the tables always exist after a deploy.
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx worker/index.ts"]
