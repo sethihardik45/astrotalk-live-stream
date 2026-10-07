@@ -94,7 +94,7 @@ describe("rotation (make-before-break)", () => {
   });
 
   it("rotate needs something live; confirm needs a rotation", async () => {
-    await expect(rotateStream({ serverUrl: SERVER, streamKey: KEY1, ip: null })).rejects.toThrow(/Nothing is live/);
+    await expect(rotateStream({ serverUrl: SERVER, streamKey: KEY1, ip: null })).rejects.toThrow(/No Instagram stream is live/);
     await startStream({ serverUrl: SERVER, streamKey: KEY1, ip: null });
     await expect(confirmSwitch()).rejects.toThrow(/no rotation/);
   });
@@ -233,6 +233,59 @@ describe("LiveKit webhook endpoint", () => {
     const res = await post(body, await signed(body));
     expect(res.status).toBe(200);
     expect((await db.streamSession.findUniqueOrThrow({ where: { id: s.id } })).status).toBe("failed");
+  });
+});
+
+describe("Instagram and YouTube at the same time", () => {
+  const YT = "rtmp://a.rtmp.youtube.com/live2";
+  const YT_KEY = "yt-key-AAAA-BBBB-CCCC";
+
+  it("runs one independent stream per platform, both filming the same layout page", async () => {
+    const ig = await startStream({ serverUrl: SERVER, streamKey: KEY1, platform: "instagram", ip: null });
+    const yt = await startStream({ serverUrl: YT, streamKey: YT_KEY, platform: "youtube", ip: null });
+    expect(ig.platform).toBe("instagram");
+    expect(yt.platform).toBe("youtube");
+    expect(egress.started).toHaveLength(2);
+    expect(egress.started[0].opts.customBaseUrl).toBe(egress.started[1].opts.customBaseUrl); // same picture
+    expect(egress.started[1].urls).toEqual([`${YT}/${YT_KEY}`]);
+    expect(await liveSessions()).toHaveLength(2);
+    expect(await liveSessions("youtube")).toHaveLength(1);
+    // a second stream of the SAME platform is still refused
+    await expect(startStream({ serverUrl: YT, streamKey: "other", platform: "youtube", ip: null })).rejects.toThrow(/YouTube stream is already running/);
+    for (const n of [...NEEDLES, "yt-key-AAAA", YT_KEY]) expect(await dumpDb()).not.toContain(n);
+  });
+
+  it("rotating Instagram's key never touches YouTube", async () => {
+    const ig = await startStream({ serverUrl: SERVER, streamKey: KEY1, platform: "instagram", ip: null });
+    const yt = await startStream({ serverUrl: YT, streamKey: YT_KEY, platform: "youtube", ip: null });
+    const fresh = await rotateStream({ serverUrl: SERVER, streamKey: KEY2, platform: "instagram", ip: null });
+    expect(await liveSessions("youtube")).toHaveLength(1); // YouTube is not "rotating"
+    expect(await liveSessions("instagram")).toHaveLength(2);
+    const winner = await confirmSwitch("instagram");
+    expect(winner.id).toBe(fresh.id);
+    expect(egress.stopped).toEqual([ig.egressId]); // ONLY the old Instagram egress was stopped
+    expect((await db.streamSession.findUniqueOrThrow({ where: { id: yt.id } })).status).not.toBe("ended");
+  });
+
+  it("a YouTube failure is handled on its own: Instagram keeps running and is not restarted", async () => {
+    const ig = await startStream({ serverUrl: SERVER, streamKey: KEY1, platform: "instagram", ip: null });
+    const yt = await startStream({ serverUrl: YT, streamKey: YT_KEY, platform: "youtube", ip: null });
+    await agedOut(yt.id);
+    egress.kill(yt.egressId!);
+    await reconcileEgress({ force: true });
+    expect((await db.streamSession.findUniqueOrThrow({ where: { id: yt.id } })).status).toBe("failed");
+    const live = await liveSessions();
+    expect(live.filter((x) => x.platform === "instagram").map((x) => x.id)).toEqual([ig.id]); // untouched
+    expect(live.filter((x) => x.platform === "youtube")).toHaveLength(1); // its own single automatic retry
+    expect(egress.started[2].urls).toEqual([`${YT}/${YT_KEY}`]); // retried with YouTube's destination, not Instagram's
+    expect(egress.stopped).toEqual([]);
+  });
+
+  it("stopping one platform leaves the other running", async () => {
+    const ig = await startStream({ serverUrl: SERVER, streamKey: KEY1, platform: "instagram", ip: null });
+    const yt = await startStream({ serverUrl: YT, streamKey: YT_KEY, platform: "youtube", ip: null });
+    await stopStreams(yt.id);
+    expect((await liveSessions()).map((x) => x.id)).toEqual([ig.id]);
   });
 });
 

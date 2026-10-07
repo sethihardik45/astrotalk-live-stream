@@ -302,6 +302,14 @@ docker compose exec db pg_dump -U astro astrotalk > backup-$(date +%F).sql
 - Keep the ops console open on a computer. Check the two green dots at the top: **Schedule worker** and **Video server**.
 - The **Schedule** screen shows the week. Red hatched areas are hours with nobody scheduled. The badge shows **coverage for the next 7 days** — aim for 100%.
 
+### Streaming to Instagram AND YouTube at the same time
+The ops console has two stream boxes, **Instagram stream** and **YouTube stream**. Each one is completely independent, with its own key, its own timer, its own alerts and its own key rotation. Both show exactly the same picture (they film the same layout page). Fill in whichever you want live, or both:
+
+- **YouTube:** in YouTube Studio click **Create → Go live → Stream**. Copy the **Stream URL** (usually `rtmp://a.rtmp.youtube.com/live2`) into **Server URL** and the **Stream key** into **Stream key**, then press **Start stream** in the YouTube box.
+- If YouTube drops, only YouTube is restarted/alerted; Instagram is not touched (and the other way round). Rotating Instagram's key does not affect YouTube.
+- The transition video buttons apply to **both** streams, because it is one picture.
+- Cost note: each platform is a separate LiveKit egress, so two platforms use roughly twice the egress minutes and capacity of one.
+
 ### Starting the very first stream (or after a stop)
 1. On a desktop computer open **Instagram → your page → Live Producer** and create a new Live. It shows a **Server URL** and a **Stream key**.
 2. In the ops console, paste them into **Server URL** and **Stream key** and press **Start stream**.
@@ -310,6 +318,7 @@ docker compose exec db pg_dump -U astro astrotalk > backup-$(date +%F).sql
 > Instagram stream keys can only be used **once**, and Instagram ends every Live after **4 hours**.
 
 ### Rotating the key (about every 4 hours) — step by step
+(This is for the **Instagram** box. YouTube has no 4-hour limit, but its box offers the same rotate steps if you ever need them.)
 The ops console warns you: **amber at 3h30**, **red at 3h50** (and, if you allow it, a notification and a short beep).
 
 1. In Instagram Live Producer, create the **next** Live. Copy its **Server URL** and **Stream key**.

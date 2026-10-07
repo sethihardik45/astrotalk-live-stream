@@ -76,7 +76,7 @@ export function OpsDashboard() {
   // The oldest running stream decides the rotation warning.
   const oldest = useMemo(() => {
     if (!state) return null;
-    const withAge = state.streams.map((s) => ({ s, sec: ageSeconds(s, now) })).filter((x): x is { s: (typeof state.streams)[number]; sec: number } => x.sec != null);
+    const withAge = state.streams.filter((x) => x.platform === "instagram").map((s) => ({ s, sec: ageSeconds(s, now) })).filter((x): x is { s: (typeof state.streams)[number]; sec: number } => x.sec != null);
     return withAge.sort((a, b) => b.sec - a.sec)[0] ?? null;
   }, [state, now]);
 
@@ -152,30 +152,33 @@ export function OpsDashboard() {
         {offline && <Banner tone="amber">{S.ops.status.offline}</Banner>}
         {workerDown && <Banner tone="red">{S.ops.status.workerDown}</Banner>}
         {!state.room.reachable && <Banner tone="red">{S.ops.status.livekitDown}</Banner>}
-        {state.alert && (
-          <Banner tone="red">
+        {state.alerts.map((alert) => (
+          <Banner key={alert.sessionId} tone="red">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <strong>{S.ops.stream.alertTitle}</strong> — {state.alert.label}
-                {state.alert.reason && <span className="block text-sm opacity-90">{state.alert.reason}</span>}
-                {!state.alert.canRestart && <span className="block text-sm opacity-90">{S.ops.stream.restartNeedsKey}</span>}
+                <strong>
+                  {alert.platformName}: {S.ops.stream.alertTitle}
+                </strong>{" "}
+                — {alert.label}
+                {alert.reason && <span className="block text-sm opacity-90">{alert.reason}</span>}
+                {!alert.canRestart && <span className="block text-sm opacity-90">{S.ops.stream.restartNeedsKey}</span>}
               </div>
               <div className="flex gap-2">
-                {state.alert.canRestart && (
-                  <button className="btn btn-primary" onClick={() => act("/api/ops/stream/restart", { sessionId: state.alert!.sessionId })}>
+                {alert.canRestart && (
+                  <button className="btn btn-primary" onClick={() => act("/api/ops/stream/restart", { sessionId: alert.sessionId })}>
                     {S.ops.stream.restart}
                   </button>
                 )}
-                <button className="btn" onClick={() => act("/api/ops/stream/dismiss", { sessionId: state.alert!.sessionId })}>
+                <button className="btn" onClick={() => act("/api/ops/stream/dismiss", { sessionId: alert.sessionId })}>
                   {S.ops.stream.dismiss}
                 </button>
               </div>
             </div>
           </Banner>
-        )}
+        ))}
         {(tone === "amber" || tone === "red") && (
           <Banner tone={tone === "red" ? "red" : "amber"}>
-            <strong>{S.ops.stream.rotateNow}</strong> — {oldest ? formatDuration(oldest.sec) : ""}
+            <strong>Instagram: {S.ops.stream.rotateNow}</strong> — {oldest ? formatDuration(oldest.sec) : ""}
           </Banner>
         )}
         {toast && (
@@ -281,7 +284,9 @@ export function OpsDashboard() {
 
         {/* ---------- right: stream ---------- */}
         <div className="space-y-4">
-          <StreamPanel state={state} nowMs={now} transitionOn={state.controls.transitionOn} report={report} refresh={refresh} />
+          <StreamPanel state={state} platform="instagram" nowMs={now} transitionOn={state.controls.transitionOn} report={report} refresh={refresh} />
+          <StreamPanel state={state} platform="youtube" nowMs={now} transitionOn={state.controls.transitionOn} report={report} refresh={refresh} />
+          <p className="px-1 text-xs text-[var(--muted)]">{S.ops.stream.sameVideo}</p>
 
           <section className="panel space-y-2 p-4 text-sm">
             <label className="flex items-center gap-2">

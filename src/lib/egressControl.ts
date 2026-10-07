@@ -69,6 +69,11 @@ export function mapStatus(s: EgressStatus): StreamStatus {
 
 const LIVE_STATES: StreamStatus[] = ["starting", "active", "ending"];
 
+/** Each platform gets its OWN stream (own egress, key, timer, alerts, rotation). Both film the same layout page, so the picture is identical. */
+export const PLATFORMS = ["instagram", "youtube", "other"] as const;
+export type Platform = (typeof PLATFORMS)[number];
+export const PLATFORM_NAMES: Record<Platform, string> = { instagram: "Instagram", youtube: "YouTube", other: "Other" };
+
 export class StreamError extends Error {}
 
 /** One-at-a-time guard so a webhook and a page refresh can never both "handle" the same failure. */
@@ -102,7 +107,7 @@ export function assertPublicLayoutUrl(address = layoutUrl()) {
   }
 }
 
-async function launch(args: { url: string; label: string; rotationGroup: string | null; ip: string | null; retryUsed: boolean; liveAt: Date | null }): Promise<StreamSession> {
+async function launch(args: { url: string; label: string; platform: Platform; rotationGroup: string | null; ip: string | null; retryUsed: boolean; liveAt: Date | null }): Promise<StreamSession> {
   assertPublicLayoutUrl();
   await ensureRoom();
   const info = await egressClient().startRoomCompositeEgress(
@@ -113,6 +118,7 @@ async function launch(args: { url: string; label: string; rotationGroup: string 
   const session = await db.streamSession.create({
     data: {
       label: args.label,
+      platform: args.platform,
       egressId: info.egressId,
       status: mapStatus(info.status) === "failed" ? "starting" : mapStatus(info.status),
       rotationGroup: args.rotationGroup,
@@ -124,8 +130,8 @@ async function launch(args: { url: string; label: string; rotationGroup: string 
   return session;
 }
 
-export async function liveSessions() {
-  return db.streamSession.findMany({ where: { status: { in: LIVE_STATES } }, orderBy: { startedAt: "asc" } });
+export async function liveSessions(platform?: Platform) {
+  return db.streamSession.findMany({ where: { status: { in: LIVE_STATES }, ...(platform ? { platform } : {}) }, orderBy: { startedAt: "asc" } });
 }
 
 function validateDestination(serverUrl: string, streamKey: string): string {
@@ -138,42 +144,44 @@ function validateDestination(serverUrl: string, streamKey: string): string {
 }
 
 /** Start the first stream (nothing is live yet). */
-export async function startStream(input: { serverUrl: string; streamKey: string; label?: string; ip: string | null }) {
+export async function startStream(input: { serverUrl: string; streamKey: string; label?: string; platform?: Platform; ip: string | null }) {
+  const platform = input.platform ?? "instagram";
   const url = validateDestination(input.serverUrl, input.streamKey);
   const secrets = [url, input.streamKey, input.serverUrl];
   return serialized(async () => {
-    if ((await liveSessions()).length > 0) throw new StreamError("A stream is already running. Use “Rotate stream key” to switch to a new key.");
+    if ((await liveSessions(platform)).length > 0) throw new StreamError(`A ${PLATFORM_NAMES[platform]} stream is already running. Use “Rotate stream key” to switch to a new key.`);
     try {
-      const label = input.label?.trim() || "Live stream";
-      const s = await launch({ url, label, rotationGroup: null, ip: input.ip, retryUsed: false, liveAt: new Date() });
-      await logEvent("egress", `Stream “${label}” started`);
+      const label = input.label?.trim() || `${PLATFORM_NAMES[platform]} stream`;
+      const s = await launch({ url, label, platform, rotationGroup: null, ip: input.ip, retryUsed: false, liveAt: new Date() });
+      await logEvent("egress", `${PLATFORM_NAMES[platform]} stream “${label}” started`);
       return s;
     } catch (e) {
       const msg = safeErrorMessage(e, secrets);
-      await logEvent("egress", `Could not start stream: ${msg}`);
+      await logEvent("egress", `Could not start ${PLATFORM_NAMES[platform]} stream: ${msg}`);
       throw new StreamError(`LiveKit could not start the stream: ${msg}`);
     }
   });
 }
 
 /** Make-before-break rotation: start a SECOND egress to the new key while the old one keeps running. */
-export async function rotateStream(input: { serverUrl: string; streamKey: string; label?: string; ip: string | null }) {
+export async function rotateStream(input: { serverUrl: string; streamKey: string; label?: string; platform?: Platform; ip: string | null }) {
+  const platform = input.platform ?? "instagram";
   const url = validateDestination(input.serverUrl, input.streamKey);
   const secrets = [url, input.streamKey, input.serverUrl];
   return serialized(async () => {
-    const live = await liveSessions();
-    if (live.length === 0) throw new StreamError("Nothing is live right now. Use “Start stream” instead.");
+    const live = await liveSessions(platform);
+    if (live.length === 0) throw new StreamError(`No ${PLATFORM_NAMES[platform]} stream is live right now. Use “Start stream” instead.`);
     if (live.length >= 2) throw new StreamError("A rotation is already in progress. Finish it with “Confirm switch” first.");
     try {
       const group = live[0].rotationGroup ?? randomUUID();
       if (!live[0].rotationGroup) await db.streamSession.update({ where: { id: live[0].id }, data: { rotationGroup: group } });
-      const label = input.label?.trim() || "New stream";
-      const s = await launch({ url, label, rotationGroup: group, ip: input.ip, retryUsed: false, liveAt: null });
-      await logEvent("rotation", `Rotation started: new stream “${label}” is running next to the old one`);
+      const label = input.label?.trim() || `New ${PLATFORM_NAMES[platform]} stream`;
+      const s = await launch({ url, label, platform, rotationGroup: group, ip: input.ip, retryUsed: false, liveAt: null });
+      await logEvent("rotation", `${PLATFORM_NAMES[platform]} rotation started: new stream “${label}” is running next to the old one`);
       return s;
     } catch (e) {
       const msg = safeErrorMessage(e, secrets);
-      await logEvent("rotation", `Rotation could not start: ${msg}`);
+      await logEvent("rotation", `${PLATFORM_NAMES[platform]} rotation could not start: ${msg}`);
       throw new StreamError(`LiveKit could not start the new stream: ${msg}`);
     }
   });
@@ -198,9 +206,9 @@ async function stopOne(s: StreamSession) {
 }
 
 /** Step 3 of a rotation: the new live is on Instagram, so stop the OLD egress(es). */
-export async function confirmSwitch() {
+export async function confirmSwitch(platform: Platform = "instagram") {
   return serialized(async () => {
-    const live = await liveSessions();
+    const live = await liveSessions(platform);
     if (live.length < 2) throw new StreamError("There is no rotation in progress. (If the new stream stopped, start it again with “Start new stream”.)");
     // The NEW stream is the one still in preview (no liveAt). An automatic restart of the OLD stream is newer by start time but keeps
     // the old stream's liveAt, so "newest" would pick the wrong one.
@@ -210,7 +218,7 @@ export async function confirmSwitch() {
     const old = live.filter((s) => s.id !== newest.id);
     for (const s of old) await stopOne(s);
     await db.streamSession.update({ where: { id: newest.id }, data: { liveAt: new Date() } });
-    await logEvent("rotation", `Switch confirmed: old stream stopped, “${newest.label}” is now the live stream`);
+    await logEvent("rotation", `${PLATFORM_NAMES[platform]} switch confirmed: old stream stopped, “${newest.label}” is now the live stream`);
     return newest;
   });
 }
@@ -234,10 +242,11 @@ export async function restartFailed(sessionId: string, ip: string | null) {
     if (!failed || failed.status !== "failed") throw new StreamError("That stream has not failed.");
     const h = held.get(sessionId);
     if (!h) throw new StreamError("For safety the stream key is not kept. Please paste a new key and press Start.");
-    if ((await liveSessions()).length > 0) throw new StreamError("A stream is already running.");
+    const platform = failed.platform as Platform;
+    if ((await liveSessions(platform)).length > 0) throw new StreamError(`A ${PLATFORM_NAMES[platform]} stream is already running.`);
     held.delete(sessionId);
     try {
-      const s = await launch({ url: h.url, label: h.label, rotationGroup: null, ip, retryUsed: true, liveAt: failed.liveAt ?? new Date() });
+      const s = await launch({ url: h.url, label: h.label, platform, rotationGroup: null, ip, retryUsed: true, liveAt: failed.liveAt ?? new Date() });
       await logEvent("egress", `Stream “${h.label}” restarted by ops`);
       return s;
     } catch (e) {
@@ -324,7 +333,7 @@ async function handleUnexpectedEnd(s: StreamSession, info: EgressInfo | undefine
     data: { status: "failed", endedAt: new Date(), failureReason: reason },
   });
   if (claimed.count !== 1) return; // someone else already handled it
-  await logEvent("egress", `ALERT: stream “${s.label}” stopped unexpectedly. ${reason}`);
+  await logEvent("egress", `ALERT: ${PLATFORM_NAMES[s.platform as Platform] ?? s.platform} stream “${s.label}” stopped unexpectedly. ${reason}`);
 
   const h = held.get(s.id);
   if (!h) {
@@ -338,7 +347,7 @@ async function handleUnexpectedEnd(s: StreamSession, info: EgressInfo | undefine
   // The single automatic retry, with the same destination. It marks the new chain as "retry used" so it can never loop.
   held.delete(s.id);
   try {
-    const fresh = await launch({ url: h.url, label: h.label, rotationGroup: s.rotationGroup, ip: s.createdByIp, retryUsed: true, liveAt: s.liveAt });
+    const fresh = await launch({ url: h.url, label: h.label, platform: s.platform as Platform, rotationGroup: s.rotationGroup, ip: s.createdByIp, retryUsed: true, liveAt: s.liveAt });
     await logEvent("egress", `Automatic restart of “${h.label}” started (${fresh.id.slice(-6)})`);
   } catch (e) {
     held.set(s.id, h); // keep it available for the manual one-click restart
@@ -351,6 +360,7 @@ export function describeSession(s: StreamSession) {
   return {
     id: s.id,
     label: s.label,
+    platform: s.platform as Platform,
     status: s.status,
     startedAt: s.startedAt.toISOString(),
     liveAt: s.liveAt ? s.liveAt.toISOString() : null,

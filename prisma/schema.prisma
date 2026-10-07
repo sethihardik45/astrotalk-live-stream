@@ -92,6 +92,8 @@ model StreamSession {
   endedAt       DateTime?    @db.Timestamptz(3)
   egressId      String?      @unique
   status        StreamStatus @default(starting)
+  /// Where this stream goes: "instagram", "youtube" or "other". Each platform has its own stream, key, timer and rotation.
+  platform      String       @default("instagram")
   /// Sessions started together by one "rotate" share this value.
   rotationGroup String?
   createdByIp   String?

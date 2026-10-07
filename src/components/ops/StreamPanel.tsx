@@ -18,18 +18,22 @@ const toneBorder = { none: "border-[var(--line)]", green: "border-green-500/50",
 
 export function StreamPanel({
   state,
+  platform,
   nowMs,
   transitionOn,
   report,
   refresh,
 }: {
   state: OpsSnapshot;
+  platform: "instagram" | "youtube" | "other";
   nowMs: number;
   transitionOn: boolean;
   report: (r: ActionResult) => void;
   refresh: () => void;
 }) {
-  const live = state.streams;
+  const P = S.ops.stream.platforms[platform];
+  const live = state.streams.filter((x) => x.platform === platform);
+  const alert = state.alerts.find((a) => a.platform === platform);
   const rotating = live.length >= 2;
 
   // The Server URL is not secret, so we remember the last one for convenience. The stream key is NEVER remembered.
@@ -42,11 +46,11 @@ export function StreamPanel({
 
   useEffect(() => {
     try {
-      setServerUrl(localStorage.getItem("lastServerUrl") ?? "");
+      setServerUrl(localStorage.getItem(`lastServerUrl:${platform}`) ?? "");
     } catch {
       /* storage may be blocked; fine */
     }
-  }, []);
+  }, [platform]);
 
   async function submit(path: "/api/ops/stream/start" | "/api/ops/stream/rotate") {
     const key = streamKey;
@@ -57,11 +61,11 @@ export function StreamPanel({
       // Only remember something that looks like a plain server address. If someone pasted the whole URL including the key
       // into this box by mistake, it must never be saved in the browser.
       const u = serverUrl.trim();
-      if (/^rtmps?:\/\/[^/?\s]+(\/[A-Za-z0-9_-]{0,12}\/?)?$/i.test(u)) localStorage.setItem("lastServerUrl", u);
+      if (/^rtmps?:\/\/[^/?\s]+(\/[A-Za-z0-9_-]{0,12}\/?)?$/i.test(u)) localStorage.setItem(`lastServerUrl:${platform}`, u);
     } catch {
       /* ignore */
     }
-    const r = await opsAction(path, { serverUrl, streamKey: key, label: label || undefined });
+    const r = await opsAction(path, { serverUrl, streamKey: key, label: label || undefined, platform });
     setBusy(false);
     report(r.ok ? { ok: true, message: path.endsWith("start") ? "Stream is starting." : "New stream is starting next to the old one." } : r);
     if (r.ok) setLabel("");
@@ -79,8 +83,8 @@ export function StreamPanel({
     >
       <label className="block text-sm">
         <span className="mb-1 block font-medium">{S.ops.stream.serverUrl}</span>
-        <input className="input" type="text" inputMode="url" required value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder="rtmps://…" autoComplete="off" spellCheck={false} />
-        <span className="text-xs text-[var(--muted)]">{S.ops.stream.serverUrlHelp}</span>
+        <input className="input" type="text" inputMode="url" required value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder={P.serverUrlHint} autoComplete="off" spellCheck={false} />
+        <span className="text-xs text-[var(--muted)]">{P.help}</span>
       </label>
       <label className="block text-sm">
         <span className="mb-1 block font-medium">{S.ops.stream.streamKey}</span>
@@ -98,16 +102,17 @@ export function StreamPanel({
   );
 
   return (
-    <section className="panel space-y-4 p-4 sm:p-5" aria-labelledby="stream-h">
-      <h2 id="stream-h" className="text-lg font-semibold">
-        {S.ops.stream.title}
+    <section className="panel space-y-4 p-4 sm:p-5" aria-labelledby={`stream-h-${platform}`}>
+      <h2 id={`stream-h-${platform}`} className="text-lg font-semibold">
+        {S.ops.stream.streamTitle(P.name)}
       </h2>
 
       {/* Running streams */}
       {live.length === 0 && <p className="text-[var(--muted)]">{S.ops.stream.none}</p>}
       {live.map((s) => {
         const sec = ageSeconds(s, nowMs);
-        const tone = ageTone(sec);
+        // Only Instagram has the 4-hour limit; other platforms just show how long they have been running.
+        const tone = platform === "instagram" ? ageTone(sec) : sec == null ? "none" : "green";
         return (
           <div key={s.id} className={`rounded-xl border-2 p-4 ${toneBorder[tone]}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -145,8 +150,8 @@ export function StreamPanel({
         <div className="rounded-xl border border-sky-500/50 bg-sky-950/30 p-4">
           <h3 className="font-semibold text-sky-200">{S.ops.stream.steps.title}</h3>
           <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm">
-            <li>{S.ops.stream.steps.s1}</li>
-            <li>{S.ops.stream.steps.s2}</li>
+            <li>{S.ops.stream.steps.s1(P.tool)}</li>
+            <li>{S.ops.stream.steps.s2(P.name)}</li>
             <li>{S.ops.stream.steps.s3}</li>
           </ol>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -162,7 +167,7 @@ export function StreamPanel({
             <button
               className="btn btn-primary"
               onClick={async () => {
-                const r = await opsAction("/api/ops/stream/confirm-switch");
+                const r = await opsAction("/api/ops/stream/confirm-switch", { platform });
                 report(r.ok ? { ok: true, message: "Switched. The old stream was stopped." } : r);
                 refresh();
               }}
@@ -182,7 +187,7 @@ export function StreamPanel({
               <p className="text-sm text-[var(--muted)]">{S.ops.stream.rotateHelp}</p>
             </div>
           )}
-          {state.alert && !state.alert.canRestart && live.length === 0 && <p className="mb-3 text-sm text-amber-300">{S.ops.stream.restartNeedsKey}</p>}
+          {alert && !alert.canRestart && live.length === 0 && <p className="mb-3 text-sm text-amber-300">{S.ops.stream.restartNeedsKey}</p>}
           {destinationForm}
         </div>
       )}

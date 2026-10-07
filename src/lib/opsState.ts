@@ -2,7 +2,7 @@ import { ParticipantInfo_Kind } from "@livekit/protocol";
 import { TrackSource, TrackType } from "livekit-server-sdk";
 import type { EgressInfo } from "livekit-server-sdk";
 import { db } from "./db";
-import { canRestart, describeSession, liveSessions, reconcileEgress } from "./egressControl";
+import { canRestart, describeSession, liveSessions, PLATFORMS, PLATFORM_NAMES, reconcileEgress, type Platform } from "./egressControl";
 import { recentEvents } from "./events";
 import { getHeartbeat } from "./heartbeats";
 import { egressClient, roomName, roomService } from "./livekit";
@@ -34,16 +34,17 @@ async function build() {
   await reconcileEgress().catch(() => {}); // notices dead streams even if webhooks are not set up
 
   const settings = await loadSettings();
-  const [astrologers, blocked, shifts, sessions, events, workerBeat, workerError, dismissed] = await Promise.all([
+  const [astrologers, blocked, shifts, sessions, events, workerBeat, workerError, dismissedRows] = await Promise.all([
     db.astrologer.findMany({ select: { id: true, name: true, tagline: true, active: true } }),
     getBlockedShiftIds(),
     db.shift.findMany({ where: { endsAt: { gt: new Date(now.getTime() - 60_000) }, startsAt: { lt: new Date(now.getTime() + 12 * 3_600_000) } }, orderBy: { startsAt: "asc" } }),
-    db.streamSession.findMany({ orderBy: { startedAt: "desc" }, take: 6 }),
+    db.streamSession.findMany({ orderBy: { startedAt: "desc" }, take: 20 }),
     recentEvents(100),
     getSetting("workerHeartbeat"),
     getSetting("workerError"),
-    getSetting("streamAlertDismissed"),
+    db.setting.findMany({ where: { key: { startsWith: "streamAlertDismissed:" } } }),
   ]);
+  const dismissed = new Set(dismissedRows.map((r) => r.key.slice("streamAlertDismissed:".length)));
   const byId = new Map(astrologers.map((a) => [a.id, a]));
 
   // ---- LiveKit: who is in the room, egress status
@@ -113,12 +114,13 @@ async function build() {
         streamError: stream?.error ? safeErrorMessage(stream.error) : null,
       };
     });
-  // The alert: the newest stream failed and nothing is live now
-  const newest = sessions[0];
-  const alert =
-    live.length === 0 && newest && newest.status === "failed" && newest.id !== dismissed
-      ? { sessionId: newest.id, label: newest.label, reason: newest.failureReason, canRestart: canRestart(newest.id), at: (newest.endedAt ?? newest.startedAt).toISOString() }
-      : null;
+  // One alert per platform: that platform's newest stream failed and nothing of that platform is live now.
+  const alerts = PLATFORMS.flatMap((platform: Platform) => {
+    const newest = sessions.find((x) => x.platform === platform);
+    const anyLive = live.some((x) => x.platform === platform);
+    if (anyLive || !newest || newest.status !== "failed" || dismissed.has(newest.id)) return [];
+    return [{ platform, platformName: PLATFORM_NAMES[platform], sessionId: newest.id, label: newest.label, reason: newest.failureReason, canRestart: canRestart(newest.id), at: (newest.endedAt ?? newest.startedAt).toISOString() }];
+  });
 
   return {
     serverNow: now.toISOString(),
@@ -132,7 +134,7 @@ async function build() {
     controls: { transitionOn: settings.transitionOn, mutedOnAir: !!view.onAir && settings.forceMuteShiftId === view.onAir.id },
     worker: { lastSeen: workerBeat, error: workerError || null },
     streams,
-    alert,
+    alerts,
     diagnostics: {
       egressCount: streams.length,
       onAir: onAir
