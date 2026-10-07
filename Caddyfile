@@ -1,0 +1,33 @@
+# Caddy: the public face of the server. It obtains and renews the HTTPS certificate for your domain by itself.
+# Camera and microphone access in browsers REQUIRES https, which is why this exists.
+# {$DOMAIN} comes from the .env file (via docker-compose.yml).
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# The transition video upload can be up to 60 MB.
+	request_body {
+		max_size 70MB
+	}
+
+	# Everything goes to the web container. Caddy sets X-Forwarded-For / X-Forwarded-Proto for us and
+	# throws away any such headers a visitor tried to send, which our rate limiter relies on.
+	reverse_proxy web:3000 {
+		health_uri /api/live/ping
+		health_interval 15s
+	}
+
+	# Access log. A personal link contains a secret (/live/<secret>) and LiveKit's recorder passes a token to /egress-layout?...,
+	# so those parts of the address are replaced before anything is written. Cookies and request bodies are never logged.
+	log {
+		output stdout
+		format filter {
+			wrap console
+			fields {
+				request>uri regexp ^/(live/|egress-layout\?).* /$1[redacted]
+				request>headers>Cookie delete
+				request>headers>Authorization delete
+			}
+		}
+	}
+}

@@ -1,0 +1,61 @@
+{
+  "name": "astrotalk-live-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser-based relay that puts scheduled astrologers on the AstroTalk Instagram Live via LiveKit.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "prisma generate && next build",
+    "start": "next start",
+    "worker": "tsx --env-file-if-exists=.env worker/index.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "db:up": "tsx --env-file-if-exists=.env scripts/dev-db.ts",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx --env-file-if-exists=.env prisma/seed.ts",
+    "db:expand": "tsx --env-file-if-exists=.env scripts/expand-templates.ts",
+    "db:studio": "prisma studio",
+    "test:db": "tsx --env-file-if-exists=.env scripts/test-db.ts"
+  },
+  "dependencies": {
+    "@livekit/components-react": "^2.9.24",
+    "@livekit/components-styles": "^1.2.0",
+    "@livekit/protocol": "^1.52.1",
+    "@prisma/client": "^6.19.3",
+    "livekit-client": "^2.22.3",
+    "livekit-server-sdk": "^2.19.1",
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.6.4",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.4.0",
+    "pg": "^8.23.1",
+    "postcss": "^8.5.29",
+    "prisma": "^6.19.3",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  },
+  "allowScripts": {
+    "@embedded-postgres/darwin-arm64@18.4.0-beta.17": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true,
+    "prisma@6.19.3": true,
+    "unrs-resolver": false
+  },
+  "engines": {
+    "node": ">=22.9"
+  }
+}

@@ -1,0 +1,121 @@
+// AstroTalk Live Relay — database schema.
+// All timestamps are stored in UTC (Timestamptz). IST is only used for display.
+
+generator client {
+  provider      = "prisma-client-js"
+  // "native" = whatever machine you develop on; the second is the Linux used inside our Docker images.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Astrologer {
+  id        String   @id @default(cuid())
+  name      String
+  /// The secret part of the personal link: /live/<slug>. 24+ random URL-safe characters.
+  slug      String   @unique
+  photoUrl  String?
+  tagline   String? // e.g. "Vedic Astrologer"
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  shifts    Shift[]
+  templates ShiftTemplate[]
+}
+
+/// One concrete slot on the shared stage.
+/// A Postgres exclusion constraint (see migrations/*_no_overlap) guarantees no two shifts overlap.
+model Shift {
+  id           String   @id @default(cuid())
+  astrologerId String
+  startsAt     DateTime @db.Timestamptz(3)
+  endsAt       DateTime @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  /// Set only for shifts created by expanding a ShiftTemplate. Lets the expander stay idempotent.
+  templateId   String?
+  /// The IST calendar date (yyyy-mm-dd) this shift was generated for.
+  templateDate String?
+
+  astrologer Astrologer     @relation(fields: [astrologerId], references: [id], onDelete: Cascade)
+  template   ShiftTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@unique([templateId, templateDate])
+  @@index([startsAt])
+  @@index([endsAt])
+}
+
+model ShiftTemplate {
+  id             String   @id @default(cuid())
+  astrologerId   String
+  /// "HH:mm" in IST
+  startTimeLocal String
+  durationMinutes Int     @default(60)
+  /// 0 = Sunday ... 6 = Saturday (IST calendar day on which the shift STARTS)
+  daysOfWeek     Int[]
+  enabled        Boolean  @default(true)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  astrologer Astrologer          @relation(fields: [astrologerId], references: [id], onDelete: Cascade)
+  shifts     Shift[]
+  exceptions TemplateException[]
+}
+
+/// Remembers "ops deleted the shift generated for this template on this date",
+/// so the expander does not bring it back.
+model TemplateException {
+  id         String @id @default(cuid())
+  templateId String
+  date       String // yyyy-mm-dd (IST)
+
+  template ShiftTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, date])
+}
+
+enum StreamStatus {
+  starting
+  active
+  ending
+  ended
+  failed
+}
+
+/// One RTMP egress. NEVER stores the stream key or the server URL.
+model StreamSession {
+  id            String       @id @default(cuid())
+  label         String
+  startedAt     DateTime     @default(now()) @db.Timestamptz(3)
+  endedAt       DateTime?    @db.Timestamptz(3)
+  egressId      String?      @unique
+  status        StreamStatus @default(starting)
+  /// Sessions started together by one "rotate" share this value.
+  rotationGroup String?
+  createdByIp   String?
+  /// When this stream actually started counting against Instagram's 4-hour limit: set when it is started on its own, or when
+  /// ops press "Confirm switch" during a rotation (the new stream may run in preview for a while before that).
+  liveAt        DateTime?    @db.Timestamptz(3)
+  /// Short, key-free reason when status = failed (already redacted).
+  failureReason String?
+
+  @@index([status])
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+/// Ops event log (shift on/off, egress started/stopped/failed, permission changes, rotations).
+/// Never contains stream keys. The ops page shows the latest 100.
+model EventLog {
+  id      String   @id @default(cuid())
+  at      DateTime @default(now()) @db.Timestamptz(3)
+  type    String
+  message String
+
+  @@index([at])
+}
