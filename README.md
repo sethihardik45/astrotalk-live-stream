@@ -51,7 +51,7 @@ The five moving parts, in plain words:
 | **Astrologer page** | Shows the countdown, lets them test devices, and publishes their camera the moment the server allows it. |
 | **Worker** | A small program that never sleeps. Every 2 seconds it asks: *who should be on air right now?* and makes LiveKit match (lets that person publish, stops everyone else, removes people whose time is over). |
 | **LiveKit** | The video server. Takes the astrologer's video and runs the "egress" that sends our picture to Instagram. |
-| **Layout page** | The page LiveKit "films". Shows only the on-air astrologer, their name, a "Next: …" strip and the logo. Shows a "we will be right back" video when nobody is on air. |
+| **Layout page** | The page LiveKit "films". Shows only the on-air astrologer's video, with nothing drawn on top of it (no name, title, "Next:" strip or logo). Shows the "we will be right back" video when nobody is on air. |
 | **Ops console** | Where you paste the Instagram key, see who is on air, rotate the key, and press emergency buttons. |
 
 **Why can't an astrologer cheat?** Their link gives them a LiveKit pass that *cannot publish*. Only the worker can allow publishing, and only for the person whose shift is running right now. Even a modified browser cannot get past LiveKit's server. As a second safety net the layout page ignores everyone except the person the schedule says is on air.

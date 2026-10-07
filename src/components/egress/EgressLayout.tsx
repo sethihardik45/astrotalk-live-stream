@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ParticipantKind, Room, RoomEvent, Track, type RemoteAudioTrack, type RemoteVideoTrack } from "livekit-client";
 import { EMPTY_METADATA, parseRoomMetadata, type RoomMetadata } from "@/lib/schedule/roomMetadata";
-import { S } from "@/lib/strings";
-import { formatTimeIst } from "@/lib/time";
 
 /**
  * THE PICTURE THAT GOES TO INSTAGRAM.
@@ -15,9 +13,10 @@ import { formatTimeIst } from "@/lib/time";
  * why we do not use that part of it.) Hand-offs, silence and transition videos all happen inside this one running page.
  *
  * WHAT IT SHOWS is decided by ROOM METADATA written by our worker (see src/lib/schedule/roomMetadata.ts):
- *   - normal:        the on-air astrologer's video (cropped to portrait) + audio, name/tagline, "Next: ..." strip
+ *   - normal:        the on-air astrologer's video (cropped to portrait) + audio, and NOTHING drawn on top of it
+ *                    (no name, no tagline, no "Next:" strip, no logo — removed on request)
  *   - transition:    looping transition video + its audio  (ops switch, or nobody scheduled, or the on-air person is not connected)
- *   - connecting:    a branded "Connecting..." card while the on-air person's camera is not sending yet
+ *   - connecting:    a plain dark screen while the on-air person's camera is not sending yet (or is switched off)
  *
  * SAFETY: only the participant whose identity equals metadata.onAirIdentity is ever subscribed to / shown / heard. Everyone else
  * is ignored here even if something went wrong with permissions on the server.
@@ -29,10 +28,6 @@ import { formatTimeIst } from "@/lib/time";
 const STAGE_W = 720;
 const STAGE_H = 1280;
 const LOGO_URL = "/brand/logo.svg";
-// Instagram Live draws its own header at the top and the comment box at the bottom, so we keep our graphics clear of them.
-const TOP_SAFE = 190; // px reserved at the top
-const LOWER_THIRD_BOTTOM = 290; // distance of the name plate from the bottom
-const NEXT_STRIP_BOTTOM = 215;
 
 type Demo = "onair" | "transition" | "connecting" | "empty" | null;
 
@@ -239,8 +234,6 @@ export function EgressLayout() {
   }
 
   const hasPicture = !!video && !camMuted && !showTransition;
-  const nextText =
-    meta.nextName && meta.nextStartsAt ? S.layout.nextUp(meta.nextName, formatTimeIst(new Date(meta.nextStartsAt))) : null;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", overflow: "hidden" }}>
@@ -281,25 +274,9 @@ export function EgressLayout() {
               muted
               style={{ position: "absolute", inset: 0, width: STAGE_W, height: STAGE_H, objectFit: "cover", objectPosition: "center 35%", display: hasPicture ? "block" : "none" }}
             />
-            {!hasPicture && (demo === "onair" ? <DemoPicture /> : <BrandCard title={camMuted ? (meta.onAirName ?? "") : S.layout.connecting} subtitle={camMuted ? (meta.onAirTagline ?? "") : (meta.onAirName ?? "")} />)}
+            {/* While the camera is starting or switched off: a plain dark screen. No logo, no name, no text. */}
+            {!hasPicture && (demo === "onair" ? <DemoPicture /> : <div style={{ position: "absolute", inset: 0, background: "#0b0d12" }} />)}
             <audio ref={audioEl} autoPlay />
-
-            {/* Lower third: name + tagline */}
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: LOWER_THIRD_BOTTOM, padding: "0 36px" }}>
-              <div style={{ background: "linear-gradient(90deg, rgba(20,16,48,0.92), rgba(20,16,48,0.7))", borderLeft: "8px solid #8b7bff", borderRadius: 14, padding: "18px 26px" }}>
-                <div style={{ color: "#fff", fontSize: 46, fontWeight: 700, lineHeight: 1.1 }}>{meta.onAirName}</div>
-                {meta.onAirTagline && <div style={{ color: "#cfc8ff", fontSize: 28, marginTop: 6 }}>{meta.onAirTagline}</div>}
-              </div>
-            </div>
-
-            {/* Next strip */}
-            {nextText && (
-              <div style={{ position: "absolute", left: 36, bottom: NEXT_STRIP_BOTTOM, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 26, padding: "8px 18px", borderRadius: 999 }}>{nextText}</div>
-            )}
-
-            {/* Logo, clear of Instagram's top bar */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={LOGO_URL} alt="" width={200} height={60} style={{ position: "absolute", left: 36, top: TOP_SAFE, opacity: 0.95 }} />
           </>
         )}
       </div>
