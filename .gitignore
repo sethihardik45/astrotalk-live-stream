@@ -8,3 +8,6 @@ next-env.d.ts
 
 data/
 tools/
+
+# Railway variable files contain secrets
+railway-*.env

@@ -261,6 +261,25 @@ Open `https://live.yourcompany.com/ops`, log in, and check the top bar shows **S
 
 **8. Add the LiveKit webhook** (section 3): `https://live.yourcompany.com/api/livekit/webhook`.
 
+### Alternative: deploy on Railway (no server to manage)
+
+Railway builds straight from GitHub and gives you an https address, so you need neither Caddy nor a tunnel. The repo contains two config files for it (`railway.web.json`, `railway.worker.json`).
+
+1. Push this repo to GitHub (private).
+2. In Railway: **New Project → Deploy from GitHub repo →** pick the repo. This creates one service; rename it **web**.
+3. In the project press **New → Database → Add PostgreSQL**. Keep its name **Postgres** (the variable files refer to it by that name).
+4. Press **New → GitHub Repo →** the same repo again; rename it **worker**.
+5. For each service open **Settings → Config-as-code → Railway Config File** and enter `railway.web.json` for **web** and `railway.worker.json` for **worker**.
+6. For **web**: **Settings → Networking → Generate Domain**.
+7. Open each service's **Variables → Raw Editor**, paste the matching list (`NEXT_PUBLIC_APP_URL` is filled from the generated domain by Railway), and deploy:
+   - web: `DATABASE_URL`, `LIVEKIT_URL`, `NEXT_PUBLIC_LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `NEXT_PUBLIC_APP_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}`, `OPS_PASSWORD`, `SESSION_SECRET`, `HOSTNAME=0.0.0.0`
+   - worker: the same list, but `NEXT_PUBLIC_APP_URL=https://${{web.RAILWAY_PUBLIC_DOMAIN}}` and no `HOSTNAME`
+   - `DATABASE_URL` is `${{Postgres.DATABASE_URL}}` in both.
+8. The **worker** creates the database tables when it deploys (its "pre-deploy command"). If the web service shows errors on the very first deploy, redeploy **web** once after the worker is up.
+9. Add the LiveKit webhook `https://YOUR-RAILWAY-DOMAIN/api/livekit/webhook`.
+
+Notes: keep **one** replica of web; do not redeploy during a live stream (the web service forgets the stream key when it restarts); the uploaded transition video needs a Railway Volume mounted at `/data/uploads` on **web** (also set the variable `RAILWAY_RUN_UID=0`), otherwise it falls back to the built-in video after each deploy.
+
 **Updating to a new version later:**
 
 ```bash
