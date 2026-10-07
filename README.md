@@ -1,6 +1,6 @@
-# AstroTalk Live Relay
+# Astrotalk Live Relay
 
-Put scheduled astrologers on the AstroTalk Instagram Live **from a link in their browser** — no Instagram login, no software to install.
+Put scheduled astrologers on the Astrotalk Instagram Live **from a link in their browser** — no Instagram login, no software to install.
 
 - Astrologers open their personal link, check camera and mic, and wait.
 - At their slot start the server puts them on air by itself. At slot end the next astrologer takes over, and the Instagram stream does not stop.
@@ -66,7 +66,7 @@ The five moving parts, in plain words:
 | LiveKit | A free **LiveKit Cloud** account ([cloud.livekit.io](https://cloud.livekit.io)). Egress (sending to Instagram) is a feature of the LiveKit Cloud plan — check your plan includes it. |
 | A public address for local testing | A free **Cloudflare Tunnel** or **ngrok** (section 4). LiveKit's servers must be able to open our layout page over the internet. |
 | Going live for real | A small server (VPS) with a domain name, in India (Mumbai or Bangalore) for lowest delay. 2 CPUs / 4 GB RAM is plenty. |
-| Instagram | Access to **Instagram Live Producer** on a desktop computer for the AstroTalk page (this is where Instagram shows the Server URL and Stream key). |
+| Instagram | Access to **Instagram Live Producer** on a desktop computer for the Astrotalk page (this is where Instagram shows the Server URL and Stream key). |
 
 To check Node is installed, open a terminal and type `node -v`. It should print `v22` or higher.
 
@@ -351,7 +351,7 @@ They are watching the Instagram Live on another device with the sound on while t
 Nobody will be put on or taken off air automatically. On the server: `docker compose ps` and `docker compose logs --tail 50 worker`. Restart it with `docker compose restart worker`. Locally, check the terminal where you ran `npm run worker`.
 
 **"Start stream" fails, or the stream is "Starting" and then fails (egress not starting).**
-1. Is `NEXT_PUBLIC_APP_URL` the **public https address**? Open `<that address>/egress-layout` in a normal browser; you should see "This page is used by the AstroTalk stream". If you cannot, LiveKit cannot either (local testing: is the tunnel running, and did you restart `npm run dev` and `npm run worker` after changing the address?).
+1. Is `NEXT_PUBLIC_APP_URL` the **public https address**? Open `<that address>/egress-layout` in a normal browser; you should see "This page is used by the Astrotalk stream". If you cannot, LiveKit cannot either (local testing: is the tunnel running, and did you restart `npm run dev` and `npm run worker` after changing the address?).
 2. Is your LiveKit plan allowed to use Egress? Check the LiveKit dashboard.
 3. The Server URL must start with `rtmp://` or `rtmps://`.
 4. The ops event log (bottom of the console) shows the reason, with the key hidden.

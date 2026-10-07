@@ -1,4 +1,4 @@
-// AstroTalk Live Relay — database schema.
+// Astrotalk Live Relay — database schema.
 // All timestamps are stored in UTC (Timestamptz). IST is only used for display.
 
 generator client {

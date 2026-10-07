@@ -91,7 +91,7 @@ export function OpsDashboard() {
       if (oldest.sec >= limit && !firedRef.current.has(id)) {
         firedRef.current.add(id);
         if (beepOn) beep();
-        if (notifyOn && typeof Notification !== "undefined" && Notification.permission === "granted") new Notification("AstroTalk Live", { body: text });
+        if (notifyOn && typeof Notification !== "undefined" && Notification.permission === "granted") new Notification("Astrotalk Live", { body: text });
       }
     }
   }, [oldest, beepOn, notifyOn]);

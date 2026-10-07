@@ -1,4 +1,4 @@
-# AstroTalk Live Relay — implementation plan
+# Astrotalk Live Relay — implementation plan
 
 (Written at the start of the build. Kept in the repo so you can see the reasoning. The README is the user-facing doc.)
 

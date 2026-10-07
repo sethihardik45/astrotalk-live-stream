@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 // Personal links are secrets: keep them out of search engines and never send them as a Referer to other sites.
 export const metadata: Metadata = {
-  title: "AstroTalk Live",
+  title: "Astrotalk Live",
   robots: { index: false, follow: false },
   referrer: "no-referrer",
 };

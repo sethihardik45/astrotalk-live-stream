@@ -235,7 +235,7 @@ export function EgressLayout() {
   }, [meta.muted, audio]);
 
   if (missingParams) {
-    return <main style={{ padding: 24, color: "#aaa", fontFamily: "sans-serif" }}>This page is used by the AstroTalk stream. There is nothing to see here.</main>;
+    return <main style={{ padding: 24, color: "#aaa", fontFamily: "sans-serif" }}>This page is used by the Astrotalk stream. There is nothing to see here.</main>;
   }
 
   const hasPicture = !!video && !camMuted && !showTransition;
@@ -269,7 +269,7 @@ export function EgressLayout() {
           onLoadedData={() => setTransitionBroken(false)}
           style={{ position: "absolute", inset: 0, width: STAGE_W, height: STAGE_H, objectFit: "cover", display: showTransition && !transitionBroken ? "block" : "none" }}
         />
-        {showTransition && transitionBroken && <BrandCard title="We will be right back" subtitle="AstroTalk Live" />}
+        {showTransition && transitionBroken && <BrandCard title="We will be right back" subtitle="Astrotalk Live" />}
 
         {/* The on-air astrologer */}
         {!showTransition && (

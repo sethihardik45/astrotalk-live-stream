@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AstroTalk Live",
-  description: "AstroTalk Live relay",
+  title: "Astrotalk Live",
+  description: "Astrotalk Live relay",
   // None of our pages should ever appear in search results.
   robots: { index: false, follow: false },
 };

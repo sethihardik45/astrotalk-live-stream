@@ -3,11 +3,11 @@
  * means editing only this file. Plain English, no jargon.
  */
 export const S = {
-  appName: "AstroTalk Live",
+  appName: "Astrotalk Live",
 
   invalid: {
     title: "This link is not valid",
-    body: "Please check the link you were sent, or ask the AstroTalk team for a new one.",
+    body: "Please check the link you were sent, or ask the Astrotalk team for a new one.",
   },
 
   live: {
@@ -55,7 +55,7 @@ export const S = {
     replacedBody: "You opened your link on another tab or device, so this one has been disconnected. Only the newest one stays connected.",
     useThisOne: "Use this tab instead",
     removedTitle: "You were taken off the stage",
-    removedBody: "The AstroTalk team ended your turn. Please contact them if this is a surprise.",
+    removedBody: "The Astrotalk team ended your turn. Please contact them if this is a surprise.",
     connection: {
       connecting: "Connecting...",
       connected: "Connected",
@@ -78,7 +78,7 @@ export const S = {
   },
 
   ops: {
-    title: "AstroTalk Live — Ops",
+    title: "Astrotalk Live — Ops",
     login: { title: "Team login", password: "Password", submit: "Log in", wrong: "That password is not right.", tooMany: "Too many tries. Please wait a few minutes.", error: "Something went wrong. Please try again." },
     nav: { dashboard: "Dashboard", schedule: "Schedule", logout: "Log out" },
     status: {
@@ -200,7 +200,7 @@ export const S = {
     preview: "Check the file",
     doImport: "Import",
     whatsapp: (name: string, link: string) =>
-      `Namaste ${name} 🙏\n\nThis is your personal AstroTalk Live link. Please do not share it:\n${link}\n\nHow it works:\n1. Open the link in Chrome on your laptop a few minutes before your slot.\n2. Allow camera and microphone and check your picture.\n3. Stay on the page: you go on air automatically at your slot time, and the page tells you when your time is over.\n\nTip: use headphones, and mute the Instagram Live if you watch it on another device.`,
+      `Namaste ${name} 🙏\n\nThis is your personal Astrotalk Live link. Please do not share it:\n${link}\n\nHow it works:\n1. Open the link in Chrome on your laptop a few minutes before your slot.\n2. Allow camera and microphone and check your picture.\n3. Stay on the page: you go on air automatically at your slot time, and the page tells you when your time is over.\n\nTip: use headphones, and mute the Instagram Live if you watch it on another device.`,
   } as const,
 
   layout: {

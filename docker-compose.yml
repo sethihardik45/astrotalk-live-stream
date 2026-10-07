@@ -1,4 +1,4 @@
-# AstroTalk Live — production stack.   Start with:  docker compose up -d --build
+# Astrotalk Live — production stack.   Start with:  docker compose up -d --build
 #
 #   caddy   public web server; gets the HTTPS certificate for $DOMAIN automatically
 #   web     the website and the API (astrologer pages, ops console, egress layout page)

@@ -2,7 +2,7 @@
   "name": "astrotalk-live-relay",
   "version": "1.0.0",
   "private": true,
-  "description": "Browser-based relay that puts scheduled astrologers on the AstroTalk Instagram Live via LiveKit.",
+  "description": "Browser-based relay that puts scheduled astrologers on the Astrotalk Instagram Live via LiveKit.",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
