@@ -281,6 +281,14 @@ describe("Instagram and YouTube at the same time", () => {
     expect(egress.stopped).toEqual([]);
   });
 
+  it("catches the key pasted into the Server URL box, the usual cause of YouTube refusing the stream", async () => {
+    for (const bad of [`${YT}/${YT_KEY}`, `rtmp://a.rtmp.youtube.com/live2/something-else-1234`]) {
+      await expect(startStream({ serverUrl: bad, streamKey: YT_KEY, platform: "youtube", ip: null })).rejects.toThrow(/includes the stream key/);
+    }
+    expect(egress.started).toHaveLength(0);
+    await expect(startStream({ serverUrl: YT, streamKey: YT_KEY, platform: "youtube", ip: null })).resolves.toBeTruthy(); // the correct form still works
+  });
+
   it("stopping one platform leaves the other running", async () => {
     const ig = await startStream({ serverUrl: SERVER, streamKey: KEY1, platform: "instagram", ip: null });
     const yt = await startStream({ serverUrl: YT, streamKey: YT_KEY, platform: "youtube", ip: null });

@@ -135,7 +135,13 @@ export async function liveSessions(platform?: Platform) {
 }
 
 function validateDestination(serverUrl: string, streamKey: string): string {
-  if (serverUrl.includes("?")) throw new StreamError("The Server URL looks like it includes the stream key. Paste only the Server URL here, and the key in the Stream key box.");
+  const keyInUrl = "The Server URL looks like it includes the stream key. Paste only the Server URL here, and the key in the Stream key box.";
+  if (serverUrl.includes("?")) throw new StreamError(keyInUrl);
+  // The key typed in BOTH boxes (or the whole "URL/key" pasted into the first one) would be sent twice and the platform would refuse it.
+  const key = streamKey.trim();
+  if (key.length >= 6 && serverUrl.includes(key)) throw new StreamError(keyInUrl);
+  // YouTube's address is always just .../live2. Anything longer means the key was pasted into the address box.
+  if (/youtube\.com/i.test(serverUrl) && serverUrl.replace(/\/+$/, "").split("/").filter(Boolean).length > 3) throw new StreamError(keyInUrl);
   try {
     return joinRtmpUrl(serverUrl, streamKey);
   } catch (e) {
